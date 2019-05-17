@@ -31,6 +31,8 @@ print(housing.describe())
 #housing.hist(bins=50, figsize=(20,15))
 #plt.show()
 
+# custom dataset splitter. Better method is StratifiedShuffleSplit
+'''
 def split_train_test(data, test_ratio):
  shuffled_indices = np.random.permutation(len(data))
  test_set_size = int(len(data) * test_ratio)
@@ -41,7 +43,7 @@ def split_train_test(data, test_ratio):
 
 train_set, test_set = split_train_test(housing, 0.2)
 print(len(train_set), "train +", len(test_set), "test")
-
+'''
 
 train_set, test_set = train_test_split(housing, test_size=0.2, random_state=42)
 housing["income_cat"] = np.ceil(housing["median_income"] / 1.5)
@@ -57,6 +59,7 @@ for set in (strat_train_set, strat_test_set):
 
 # Copy Training Set
 housing = strat_train_set.copy()
+
 # Plot Geographical Data. Should look like California. Alpha = .1 tells me where there is high density
 housing.plot(kind="scatter", x="longitude", y="latitude",alpha = .1)
 
@@ -88,6 +91,10 @@ housing["population_per_household"]=housing["population"]/housing["households"]
 corr_matrix = housing.corr()
 df2 = corr_matrix["median_house_value"].sort_values(ascending=False)
 print(df2)
+
+# Prepare the Data for Machine Learning Algorithms
+housing = strat_train_set.drop("median_house_value", axis=1)
+housing_labels = strat_train_set["median_house_value"].copy()
 
 # fill any nulls/blanks with median. There is also fillna method but this is fancy
 imputer = Imputer(strategy="median")
@@ -139,6 +146,8 @@ class CombinedAttributesAdder(BaseEstimator, TransformerMixin):
 attr_adder = CombinedAttributesAdder(add_bedrooms_per_room=False)
 housing_extra_attribs = attr_adder.transform(housing.values)
 
+
+
 # Using Pipeline, transform data
 num_pipeline = Pipeline([
  ('imputer', Imputer(strategy="median")),
@@ -157,3 +166,37 @@ full_pipeline = ColumnTransformer([
     ])
 
 housing_prepared = full_pipeline.fit_transform(housing)
+
+# Select and Train Model Begins # pg 68
+
+#
+# let's try the full preprocessing pipeline on a few training instances
+
+lin_reg = LinearRegression()
+lin_reg.fit(housing_prepared, housing_labels)
+
+
+some_data = housing.iloc[:5]
+some_labels = housing_labels.iloc[:5]
+some_data_prepared = full_pipeline.transform(some_data)
+print("Predictions:\t", lin_reg.predict(some_data_prepared))
+#Predictions: [ 303104. 44800. 308928. 294208. 368704.]
+
+# mean squared error method
+from sklearn.metrics import mean_squared_error
+housing_predictions = lin_reg.predict(housing_prepared)
+lin_mse = mean_squared_error(housing_labels, housing_predictions)
+lin_rmse = np.sqrt(lin_mse)
+print(lin_rmse)
+
+# Decision Tree Method
+from sklearn.tree import DecisionTreeRegressor
+tree_reg = DecisionTreeRegressor()
+tree_reg.fit(housing_prepared, housing_labels)
+
+
+housing_predictions = tree_reg.predict(housing_prepared)
+tree_mse = mean_squared_error(housing_labels, housing_predictions)
+tree_rmse = np.sqrt(tree_mse)
+print(tree_rmse)# shows how far off error is. In this case, 0.0. 
+
